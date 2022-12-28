@@ -1,0 +1,7 @@
+aks_service_principal_app_id = "<service_principal_app_id>"
+aks_service_principal_client_secret = "<service_principal_password>"
+
+agent_min_count = null
+agent_max_count = null
+
+acr_name = "simpsquotesmlcacr"

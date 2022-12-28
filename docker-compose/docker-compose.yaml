@@ -1,0 +1,60 @@
+version: '3.7'
+
+services:
+  api:
+   image: simpsons-quotes
+   build:
+    context: ../simpsons-quotes/api 
+   container_name: simpsons-quotes
+   environment:
+    - DB_HOST=db
+    - DB_PORT=3306
+    - DB_USER=root
+    - DB_PASS=Password123
+   depends_on: 
+    db:
+      condition: service_healthy
+   networks:
+    - default
+
+  db:
+    image: mysql:8.0.29
+    ports:
+      - 33306:3306
+    volumes:
+      - ../simpsons-quotes/db/data:/var/lib/mysql
+     # - ../simpsons-quotes/db/alta_db.sql:/usr/alta_db.sql
+    environment:
+      - MYSQL_ROOT_PASSWORD=Password123
+    # Probado en sh de contenedor:
+    # mysql --user=root --password=$MYSQL_ROOT_PASSWORD < alta_db.sql 
+    #command: sh -c "sleep 8 && mysql --protocol=tcp --user=root --password=$$MYSQL_ROOT_PASSWORD < /usr/alta_db.sql"
+    healthcheck:
+        test: "mysqladmin ping -h localhost --user=root --password=$MYSQL_ROOT_PASSWORD"
+        interval: 2s
+        timeout: 10s
+        retries: 7
+    networks:
+      - default
+
+
+
+  db-job:
+    image: mysql:8.0.29
+    ports:
+      - 33307:3306
+    volumes:
+      - ../simpsons-quotes/db/alta_db.sql:/usr/alta_db.sql
+    environment:
+      - MYSQL_ROOT_PASSWORD=Password123
+    command: sh -c "mysql -h db --protocol=tcp --user=root --password=$$MYSQL_ROOT_PASSWORD < /usr/alta_db.sql"
+    depends_on: 
+      db:
+        condition: service_healthy
+    networks:
+      - default
+
+
+networks:
+  default:
+    driver: bridge
