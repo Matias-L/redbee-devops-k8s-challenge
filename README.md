@@ -1,69 +1,52 @@
-# Redbee Challenge - Simpsons Quotes API
+# Redbee Challenge - Simpsons Quotes API - Matias
 
 ![homer-console](simpsons-quotes/images/homer-simpson.gif)
 
-## Enunciado
+# Pre-requisitos
 
-Se tiene una API hecha en Python con FastApi+SQLAlchemy y su correspondiente Base de datos en MySQL.
+a- Disponer de una cuenta en [Azure](https://portal.azure.com)
 
-Al momento la misma se encuentra dockerizada y se puede ejecutar localmente (Ver ejemplo).
+b- Instalar y configurar la [CLI de Azure](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli)
 
-Para permitir la alta disponibilidad de la aplicación, se deberá levantar un cluster de **Kubernetes**
-### Objetivos:
+c- [Configurar una entidad de servicio.](https://learn.microsoft.com/es-es/azure/developer/terraform/authenticate-to-azure?tabs=bash#create-a-service-principal). Tomar nota de la _APP ID_ y _APP PASSWORD_.
 
-* Buildear la imagen de la API y subirla a la registry de docker que utilice el cluster.
-* Generar los correspondientes Deployments para las aplicaciones y verificar que están visibles entre sí utilizando el objeto Service.
-* Generar un Volumen persistente para la Base de datos.
-* Generar un Secrets de K8S para evitar acceder a la contraseña de la base por texto plano.
-* Generar el Ingress para que la API sea accesible y pueda consultarse mediante curl, o desde un navegador.
+d- Instalar terraform >=1.0. (Opcional: Instalar [tfenv](https://github.com/tfutils/tfenv) para administrar distintas versiones de terraform )
 
-### Opcional:
+e- Instalar [Kubectl](https://kubernetes.io/docs/tasks/tools/) 
 
-* Armar un README explicando como realizar el alta de cada recurso de K8S y como acceder a la API.
+f- Opcional: Instalar [Lens](https://k8slens.dev/)
 
-**Para la resolución se recomienda utilizar [Minikube](https://minikube.sigs.k8s.io/docs/start/), pero se puede utilizar cualquier servicio Kubernetes que tengas de preferencia.**
+# Procedimiento
 
----
+## Creación de infraestructura
 
-### *Ejemplo: Como ejecutar localmente utilizando solo Docker*
+1. Clonar el repositorio. 
+2. Ubicarse sobre el directorio _terraform_
+3. Nos logueamos a la cli de Azure con el comando `az login`
+4. Inicializar el state con `terraform init`
+5. Copiar el archivo `terraform.tfvars.example` en el mismo directorio con el nombre `terraform.tfvars`. Sobre el mismo, reemplazar los campos `<service_principal_app_id>` y `<service_principal_password>` con los valores de `APP_ID` y `APP_PASSWORD` obtenidos en el pre-requisito *c*.
+6. Levantar la infraestructura con el comando `terraform apply`. Se nos mostrará un detalle de los recursos a levantar. Si está todo el orden, confirmar escribiendo `yes` cuando se nos solicite.
 
-* Levantar la Base de Datos:
+## Configuración kubernetes
 
-```bash
-# Ejecutamos la base con una persistencia
-cd db
+Una vez creado el cluster en Azure, procedemos a conectarnos para luego crear los recursos sobre el mismo.
 
-docker run --name simpsons-mysql -p 33306:3306/tcp -v $(pwd)/data:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=Password123 -d mysql:8.0.29
-```
 
-* Obtenemos la ip del container (IP_BD)
+1. Obtenemos las credenciales para el cluster levantado previamente con el comando `az aks get-credentials --resource-group k8s-rg --name k8stest`  (Nota: En caso de administrar mutiples cluster, se recomienda utilizar la opción `-f <path_to_file>` y luego setear el contexto exportando la variable de entorno KUBECONFIG sobre ese archivo)
+2. Para verificar que la conexión se realizó correctamente, ejecutamos el comando `kubectl cluster-info`
+3. Creamos el namespace sobre el cual se levantarán los recursos con el comando `kubectl create namespace simpsons-quotes-ns`
+4. Instalamos el Nginx Ingress Controller ejecutando `kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.5.1/deploy/static/provider/cloud/deploy.yaml`
+5. Nos ubicamos sobre el directorio *k8s* y levantamos los recursos de kubernetes aplicando el archivo ubicado allí con el comando `kubectl apply -f manifest.yaml`.
+6. Una vez aplicado, esperamos un minuto hasta que inicializen los pods. Luego, obtenemos la IP del load balancer sobre el cual podemos hacer queries con `kubectl get ing --namespace simpsons-quotes-ns`
 
-```bash
-docker inspect simpsons-mysql |grep IPAddress
-```
+## Uso de la aplicación 
 
-* Cargamos los datos:
-
-```bash
-mysql -P3306 -h <IP_BD>-u root -p < alta_db.sql
-```
-
-* Levantar la API:
-
-```bash
-cd api
-
-docker build -t simpsons-quotes:0.1.3 .
-
-docker run --name simpsons-api -e DB_HOST=<IP_BD> -e DB_PORT=3306 -e DB_USER=root -e DB_PASS=Password123 simpsons-quotes:0.1.3
-```
-
-* Consultar a la API:
+<IP_ADDR> se refiere a la IP obtenida en el punto *6*:
 
 ```bash
 # Ver frases
-curl "http://172.17.0.3:8000/quotes" -s
+curl "http://<IP_ADDR>/quotes" -s
 
 # Consultar API Docs (desde el navegador)
-http://172.17.0.3:8000/docs
+http://<IP_ADDR>/docs
 ```
