@@ -123,6 +123,7 @@ data:
   DB_USER: cm9vdA==                         #"root"
   DB_PASS: UGFzc3dvcmQxMjM=                 #"Password123"
 ---
+# kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.5.1/deploy/static/provider/cloud/deploy.yaml
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
